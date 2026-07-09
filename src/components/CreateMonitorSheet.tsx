@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Globe, ChevronDown, Loader2 } from 'lucide-react';
+import { X, Globe, ChevronDown, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useApp } from '@/contexts/AppContext';
 import { useMonitors } from '@/contexts/MonitorsContext';
-import { TEMPLATE_CATEGORIES, CUSTOM_TEMPLATES_LIST, type TemplateCategory } from '@/data/templates';
+import { api } from '@/api';
+import { TEMPLATE_CATEGORIES, type TemplateCategory } from '@/data/templates';
 import { shieldAlert, settings, layout, globe, lock, cpu, eye } from '@/utils/icons';
 import type { TemplateMode, ScheduleType, NotificationLevel } from '@/types';
 
@@ -58,6 +59,30 @@ export default function CreateMonitorSheet() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const initializedRef = useRef<string | null>(null);
+
+  // Real template catalog from the backend (falls back to the static list).
+  const [categories, setCategories] = useState<TemplateCategory[]>(TEMPLATE_CATEGORIES);
+  const [tplQuery, setTplQuery] = useState('');
+  const [tplResults, setTplResults] = useState<{ id: string; path: string }[]>([]);
+  const [tplInstalled, setTplInstalled] = useState(true);
+
+  useEffect(() => {
+    if (!isCreateSheetOpen) return;
+    api.getTemplates()
+      .then(t => { if (t.categories?.length) setCategories(t.categories as TemplateCategory[]); setTplInstalled(t.installed); })
+      .catch(() => { /* keep static fallback */ });
+  }, [isCreateSheetOpen]);
+
+  useEffect(() => {
+    if (templateMode !== 'custom' || !isCreateSheetOpen) return;
+    const q = tplQuery.trim();
+    const handle = setTimeout(() => {
+      api.searchTemplates(q, 60)
+        .then(r => setTplResults(r.results || []))
+        .catch(() => setTplResults([]));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [tplQuery, templateMode, isCreateSheetOpen]);
 
   useEffect(() => {
     const key = isCreateSheetOpen ? (editingMonitorId || '__new__') : null;
@@ -238,7 +263,7 @@ export default function CreateMonitorSheet() {
 
             {templateMode === 'categories' && (
               <div className="grid grid-cols-2 gap-2">
-                {TEMPLATE_CATEGORIES.map((cat: TemplateCategory) => {
+                {categories.map((cat: TemplateCategory) => {
                   const checked = selectedCategories.includes(cat.id);
                   return (
                     <button
@@ -267,33 +292,60 @@ export default function CreateMonitorSheet() {
 
             {templateMode === 'custom' && (
               <div className="space-y-2">
-                <div
-                  className="max-h-[200px] overflow-y-auto rounded-md border space-y-0.5 p-1 sentinel-scrollbar"
-                  style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-subtle)' }}
-                >
-                  {CUSTOM_TEMPLATES_LIST.map((t: string) => {
-                    const checked = selectedTemplates.includes(t);
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => toggleTemplate(t)}
-                        className="w-full flex items-center gap-2 h-7 px-2 rounded text-[12px] font-mono transition-colors text-left focus-ring"
-                        style={{
-                          backgroundColor: checked ? 'rgba(0,212,170,0.08)' : 'transparent',
-                          color: checked ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                        }}
-                      >
-                        <span
-                          className="w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0"
-                          style={{ borderColor: checked ? 'var(--accent-cyan)' : 'var(--border-subtle)' }}
-                        >
-                          {checked && <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--accent-cyan)' }} />}
-                        </span>
-                        {t}
+                {!tplInstalled && (
+                  <p className="text-[11px]" style={{ color: 'var(--severity-medium, #F59E0B)' }}>
+                    Nuclei templates are not installed on the server — run “Update Templates” in Settings. You can still type template IDs manually below.
+                  </p>
+                )}
+                {/* Selected template chips */}
+                {selectedTemplates.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedTemplates.map(t => (
+                      <button key={t} onClick={() => toggleTemplate(t)}
+                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded focus-ring"
+                        style={{ backgroundColor: 'rgba(0,212,170,0.1)', color: 'var(--accent-cyan)' }}>
+                        {t} <X size={10} />
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+                )}
+                {/* Search box */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+                  <input
+                    value={tplQuery}
+                    onChange={e => setTplQuery(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && tplQuery.trim()) { e.preventDefault(); toggleTemplate(tplQuery.trim()); setTplQuery(''); }
+                    }}
+                    placeholder="Search templates by id… (Enter to add manually)"
+                    className="w-full h-9 pl-9 pr-3 rounded-md text-[12px] font-mono focus-ring outline-none"
+                    style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+                  />
                 </div>
+                {/* Results */}
+                {tplResults.length > 0 && (
+                  <div className="max-h-[200px] overflow-y-auto rounded-md border space-y-0.5 p-1 sentinel-scrollbar"
+                    style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-subtle)' }}>
+                    {tplResults.map(t => {
+                      const checked = selectedTemplates.includes(t.id);
+                      return (
+                        <button key={t.path} onClick={() => toggleTemplate(t.id)}
+                          className="w-full flex items-center gap-2 h-7 px-2 rounded text-[12px] font-mono transition-colors text-left focus-ring"
+                          style={{ backgroundColor: checked ? 'rgba(0,212,170,0.08)' : 'transparent', color: checked ? 'var(--accent-cyan)' : 'var(--text-secondary)' }}>
+                          <span className="w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0"
+                            style={{ borderColor: checked ? 'var(--accent-cyan)' : 'var(--border-subtle)' }}>
+                            {checked && <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'var(--accent-cyan)' }} />}
+                          </span>
+                          <span className="truncate">{t.id}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {tplInstalled && tplQuery && tplResults.length === 0 && (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No templates match “{tplQuery}”. Press Enter to add it as a custom id.</p>
+                )}
               </div>
             )}
             {errors.templates && <p className="text-[11px]" style={{ color: 'var(--severity-high)' }}>{errors.templates}</p>}

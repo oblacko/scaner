@@ -1,13 +1,48 @@
 import { useState } from 'react';
-import { Globe, Clock, Database, AlertTriangle } from 'lucide-react';
+import { Globe, Clock, Database, AlertTriangle, Loader2 } from 'lucide-react';
 import TopBar from '@/components/TopBar';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useApp } from '@/contexts/AppContext';
+import { api } from '@/api';
 import type { Severity, DateFormatType } from '@/types';
 
 export default function Settings() {
   const { settings, updateSettings, resetSettings } = useSettings();
+  const { addToast } = useApp();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [updatingTemplates, setUpdatingTemplates] = useState(false);
+
+  const handleUpdateTemplates = async () => {
+    setUpdatingTemplates(true);
+    try {
+      const res = await api.updateTemplates();
+      addToast({
+        type: res.ok ? 'success' : 'alert',
+        title: res.ok ? 'Templates Updated' : 'Update Failed',
+        message: (res.output || '').split('\n').slice(-1)[0] || (res.ok ? 'Done' : 'nuclei CLI not available'),
+      });
+    } catch (err: any) {
+      addToast({ type: 'alert', title: 'Update Failed', message: err.message });
+    } finally {
+      setUpdatingTemplates(false);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const data = await api.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sentinel-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      addToast({ type: 'alert', title: 'Export Failed', message: err.message });
+    }
+  };
 
   const severityOptions: { value: Severity; label: string }[] = [
     { value: 'info', label: 'Info' },
@@ -164,7 +199,9 @@ export default function Settings() {
               />
             </div>
             <button
-              className="h-8 px-4 rounded-md text-[12px] font-medium transition-colors border focus-ring"
+              onClick={handleUpdateTemplates}
+              disabled={updatingTemplates}
+              className="h-8 px-4 rounded-md text-[12px] font-medium transition-colors border focus-ring flex items-center gap-2 disabled:opacity-50"
               style={{
                 backgroundColor: 'var(--bg-tertiary)',
                 borderColor: 'var(--border-subtle)',
@@ -173,7 +210,8 @@ export default function Settings() {
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-active)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
             >
-              Update Templates Now
+              {updatingTemplates && <Loader2 size={12} className="animate-spin-slow" />}
+              {updatingTemplates ? 'Updating…' : 'Update Templates Now'}
             </button>
           </div>
         </Section>
@@ -188,22 +226,7 @@ export default function Settings() {
                 borderColor: 'var(--border-subtle)',
                 color: 'var(--text-secondary)',
               }}
-              onClick={() => {
-                const data = {
-                  monitors: JSON.parse(localStorage.getItem('sentinel_monitors') || '[]'),
-                  scans: JSON.parse(localStorage.getItem('sentinel_scans') || '[]'),
-                  channels: JSON.parse(localStorage.getItem('sentinel_channels') || '[]'),
-                  settings: JSON.parse(localStorage.getItem('sentinel_settings') || '{}'),
-                  exportedAt: new Date().toISOString(),
-                };
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `sentinel-export-${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
+              onClick={handleExport}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-active)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
             >

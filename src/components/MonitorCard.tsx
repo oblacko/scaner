@@ -1,10 +1,15 @@
-import { Play, ExternalLink, Loader2 } from 'lucide-react';
+import { Play, ExternalLink, Square, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import StatusDot from './StatusDot';
 import SeverityBadge from './SeverityBadge';
 import type { Monitor, Severity } from '@/types';
 import { useApp } from '@/contexts/AppContext';
 import { useMonitors } from '@/contexts/MonitorsContext';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MonitorCardProps {
   monitor: Monitor;
@@ -19,9 +24,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function MonitorCard({ monitor }: MonitorCardProps) {
   const { openEditSheet } = useApp();
-  const { triggerScan } = useMonitors();
+  const { triggerScan, stopScan, deleteMonitor, scans } = useMonitors();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isScanning = monitor.status === 'scanning';
+  const activeScan = scans.find(s => s.monitorId === monitor.id && (s.status === 'running' || s.status === 'queued'));
   const totalFindings = Object.values(monitor.findingCounts).reduce((a, b) => a + b, 0);
   const severities: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
   const barSegments = severities.filter(s => monitor.findingCounts[s] > 0);
@@ -106,17 +113,26 @@ export default function MonitorCard({ monitor }: MonitorCardProps) {
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-        <button
-          onClick={() => triggerScan(monitor.id)}
-          disabled={isScanning}
-          className="flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all disabled:opacity-50 focus-ring"
-          style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}
-          onMouseEnter={e => { if (!isScanning) { e.currentTarget.style.borderColor = 'var(--border-active)'; } }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-        >
-          {isScanning ? <Loader2 size={12} className="animate-spin-slow" /> : <Play size={12} />}
-          {isScanning ? 'Scanning...' : 'Scan Now'}
-        </button>
+        {isScanning ? (
+          <button
+            onClick={() => activeScan && stopScan(activeScan.id)}
+            disabled={!activeScan}
+            className="flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all disabled:opacity-50 focus-ring"
+            style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: 'var(--severity-high)', border: '1px solid var(--severity-high)' }}
+          >
+            <Square size={11} /> Stop
+          </button>
+        ) : (
+          <button
+            onClick={() => triggerScan(monitor.id)}
+            className="flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium transition-all focus-ring"
+            style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-subtle)' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-active)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+          >
+            <Play size={12} /> Scan Now
+          </button>
+        )}
         <button
           onClick={() => openEditSheet(monitor.id)}
           className="flex items-center gap-1 h-7 px-3 rounded-md text-[12px] font-medium transition-all focus-ring"
@@ -124,10 +140,39 @@ export default function MonitorCard({ monitor }: MonitorCardProps) {
           onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
         >
-          <ExternalLink size={12} />
-          Details
+          <ExternalLink size={12} /> Edit
+        </button>
+        <button
+          onClick={() => setConfirmOpen(true)}
+          title="Delete monitor"
+          className="flex items-center gap-1 h-7 px-2 rounded-md text-[12px] font-medium transition-all focus-ring ml-auto"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = 'var(--severity-high)'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+        >
+          <Trash2 size={13} />
         </button>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: 'var(--text-primary)' }}>Delete this monitor?</AlertDialogTitle>
+            <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
+              <span className="font-mono">{monitor.url}</span> and all of its scan history will be permanently removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMonitor(monitor.id)}
+              style={{ backgroundColor: 'var(--severity-high)', color: '#fff' }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

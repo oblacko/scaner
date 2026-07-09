@@ -18,6 +18,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     api.getChannels()
       .then(data => setChannels(data.map((c: any) => ({ ...c, config: typeof c.config === 'string' ? JSON.parse(c.config) : c.config }))))
+      .catch(() => { /* leave empty if API unavailable */ })
       .finally(() => setIsLoading(false));
   }, []);
 
