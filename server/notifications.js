@@ -1,0 +1,234 @@
+const nodemailer = require('nodemailer');
+
+function buildSummary(findings) {
+  if (!findings || findings.length === 0) {
+    return 'Scan complete: No vulnerabilities found';
+  }
+  const counts = findings.reduce((acc, f) => {
+    const sev = f.severity || 'info';
+    acc[sev] = (acc[sev] || 0) + 1;
+    return acc;
+  }, {});
+  const parts = [
+    `critical: ${counts.critical || 0}`,
+    `high: ${counts.high || 0}`,
+    `medium: ${counts.medium || 0}`,
+    `low: ${counts.low || 0}`,
+    `info: ${counts.info || 0}`,
+  ];
+  return `Scan complete: ${findings.length} findings (${parts.join(', ')})`;
+}
+
+async function sendEmail(config, summary, findings) {
+  const address = config.address || process.env.EMAIL_ADDRESS;
+  if (!address) return;
+
+  const host = process.env.SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || user || 'sentinel@localhost';
+
+  if (!host || !user || !pass) {
+    throw new Error('SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)');
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+
+  const findingLines = findings.slice(0, 20).map(f => {
+    return `[${(f.severity || 'info').toUpperCase()}] ${f.name} — ${f.matchedAt || f.host || ''}`;
+  }).join('\n');
+
+  await transporter.sendMail({
+    from,
+    to: address,
+    subject: `Sentinel: ${summary}`,
+    text: `${summary}\n\n${findingLines || 'No findings'}`,
+  });
+}
+
+async function sendSlack(config, summary, findings) {
+  const webhook = config.webhook || process.env.SLACK_WEBHOOK;
+  if (!webhook) return;
+
+  const blocks = findings.slice(0, 10).map(f => ({
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: `*[${(f.severity || 'info').toUpperCase()}]* ${f.name}\n${f.matchedAt || f.host || ''}`,
+    },
+  }));
+
+  await fetch(webhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: summary,
+      blocks: [
+        { type: 'header', text: { type: 'plain_text', text: 'Sentinel Scan Report' } },
+        { type: 'section', text: { type: 'mrkdwn', text: summary } },
+        { type: 'divider' },
+        ...blocks,
+      ],
+    }),
+  });
+}
+
+async function sendTelegram(config, summary) {
+  const botToken = config.botToken || process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = config.chatId || process.env.TELEGRAM_CHAT_ID;
+  if (!botToken || !chatId) return;
+
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: `🛡️ *Sentinel Scan*\n\n${summary}`,
+      parse_mode: 'Markdown',
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Telegram API ${res.status}: ${text}`);
+  }
+}
+
+async function sendDiscord(config, summary, findings) {
+  const webhook = config.webhook || process.env.DISCORD_WEBHOOK;
+  if (!webhook) return;
+
+  const fields = findings.slice(0, 10).map(f => ({
+    name: `[${(f.severity || 'info').toUpperCase()}] ${f.name}`,
+    value: f.matchedAt || f.host || '',
+    inline: false,
+  }));
+
+  await fetch(webhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      embeds: [{
+        title: 'Sentinel Scan Report',
+        description: summary,
+        color: findings.length > 0 ? 0xff0000 : 0x00ff00,
+        fields,
+        timestamp: new Date().toISOString(),
+      }],
+    }),
+  });
+}
+
+async function sendWebhook(config, summary, findings) {
+  const url = config.url || process.env.WEBHOOK_URL;
+  if (!url) return;
+
+  await fetch(url, {
+    method: config.method || 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ summary, findings, timestamp: new Date().toISOString() }),
+  });
+}
+
+async function sendNotifications(findings, monitor) {
+  const db = require('./db');
+  const channels = db.channels().filter(c => c.enabled);
+  if (channels.length === 0) return;
+
+  const summary = buildSummary(findings);
+
+  for (const channel of channels) {
+    try {
+      const config = channel.config || {};
+      switch (channel.type) {
+        case 'email':
+          await sendEmail(config, summary, findings);
+          break;
+        case 'slack':
+          await sendSlack(config, summary, findings);
+          break;
+        case 'telegram':
+          await sendTelegram(config, summary);
+          break;
+        case 'discord':
+          await sendDiscord(config, summary, findings);
+          break;
+        case 'webhook':
+          await sendWebhook(config, summary, findings);
+          break;
+        default:
+          console.log(`[Notifier] Unknown channel type: ${channel.type}`);
+      }
+      console.log(`[Notifier] ${channel.type} sent successfully`);
+    } catch (err) {
+      console.error(`[Notifier] ${channel.type} failed:`, err.message || err);
+    }
+  }
+}
+
+async function testChannel(type, config) {
+  switch (type) {
+    case 'email': {
+      const host = process.env.SMTP_HOST;
+      const port = parseInt(process.env.SMTP_PORT || '587', 10);
+      const user = process.env.SMTP_USER;
+      const pass = process.env.SMTP_PASS;
+      if (!host || !user || !pass) throw new Error('SMTP not configured');
+      const transporter = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+      await transporter.verify();
+      return 'SMTP connection OK';
+    }
+    case 'slack': {
+      const webhook = config.webhook || process.env.SLACK_WEBHOOK;
+      if (!webhook) throw new Error('Webhook not configured');
+      const res = await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Sentinel test notification' }),
+      });
+      if (!res.ok) throw new Error(`Slack returned ${res.status}`);
+      return 'Slack webhook OK';
+    }
+    case 'telegram': {
+      const botToken = config.botToken || process.env.TELEGRAM_BOT_TOKEN;
+      if (!botToken) throw new Error('Bot token not configured');
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
+      if (!res.ok) throw new Error(`Telegram API ${res.status}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.description || 'Telegram token invalid');
+      return `Bot @${data.result.username} OK`;
+    }
+    case 'discord': {
+      const webhook = config.webhook || process.env.DISCORD_WEBHOOK;
+      if (!webhook) throw new Error('Webhook not configured');
+      const res = await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Sentinel test notification' }),
+      });
+      if (!res.ok) throw new Error(`Discord returned ${res.status}`);
+      return 'Discord webhook OK';
+    }
+    case 'webhook': {
+      const url = config.url || process.env.WEBHOOK_URL;
+      if (!url) throw new Error('URL not configured');
+      const method = config.method || process.env.WEBHOOK_METHOD || 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: method.toUpperCase() === 'GET' ? undefined : JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
+      return 'Webhook OK';
+    }
+    default:
+      throw new Error(`Unknown channel type: ${type}`);
+  }
+}
+
+module.exports = { sendNotifications, testChannel };

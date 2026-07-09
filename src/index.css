@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #0B0C10;
+    --bg-secondary: #15161A;
+    --bg-tertiary: #1E1F26;
+    --bg-hover: #252631;
+    --border-subtle: #2A2B35;
+    --border-active: #3A3B47;
+    --accent-cyan: #00D4AA;
+    --accent-cyan-dim: #00A885;
+    --accent-blue: #3B82F6;
+    --text-primary: #E8E8EC;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
+    --severity-info: #3B82F6;
+    --severity-low: #10B981;
+    --severity-medium: #F59E0B;
+    --severity-high: #EF4444;
+    --severity-critical: #DC2626;
+    --status-online: #10B981;
+    --status-offline: #EF4444;
+    --status-paused: #F59E0B;
+
+    --background: 220 14% 4%;
+    --foreground: 240 6% 93%;
+    --card: 220 12% 5%;
+    --card-foreground: 240 6% 93%;
+    --popover: 220 12% 7%;
+    --popover-foreground: 240 6% 93%;
+    --primary: 163 100% 42%;
+    --primary-foreground: 220 14% 4%;
+    --secondary: 220 8% 13%;
+    --secondary-foreground: 240 6% 93%;
+    --muted: 220 8% 13%;
+    --muted-foreground: 220 6% 55%;
+    --accent: 163 100% 42%;
+    --accent-foreground: 220 14% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 8% 18%;
+    --input: 220 8% 15%;
+    --ring: 163 100% 42%;
+    --radius: 0.375rem;
+    --sidebar-background: 220 12% 5%;
+    --sidebar-foreground: 240 6% 93%;
+    --sidebar-primary: 163 100% 42%;
+    --sidebar-primary-foreground: 220 14% 4%;
+    --sidebar-accent: 220 8% 13%;
+    --sidebar-accent-foreground: 240 6% 93%;
+    --sidebar-border: 220 8% 18%;
+    --sidebar-ring: 163 100% 42%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code, .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+}
+
+@layer components {
+  .sentinel-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .sentinel-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sentinel-scrollbar::-webkit-scrollbar-thumb {
+    background: #2A2B35;
+    border-radius: 3px;
+  }
+  .sentinel-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #3A3B47;
+  }
+}
+
+@layer utilities {
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes severity-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.animate-spin-slow {
+  animation: spin 1s linear infinite;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 300ms ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out forwards;
+}
+
+.animate-severity-pop {
+  animation: severity-pop 300ms ease-out forwards;
+}

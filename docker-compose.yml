@@ -1,0 +1,65 @@
+# Sentinel Security Monitor — Docker Compose
+#
+# Usage:
+#   docker-compose up -d --build          # SQLite (default)
+#   docker-compose --profile pg up -d --build  # PostgreSQL
+
+services:
+  sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentinel
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_DRIVER=sqlite
+      - DATABASE_URL=/data/sentinel.db
+      - DATA_DIR=/data
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# Uncomment below to use PostgreSQL:
+#
+#  postgres:
+#    image: postgres:16-alpine
+#    container_name: sentinel-postgres
+#    restart: unless-stopped
+#    profiles: ["pg"]
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+#    environment:
+#      - POSTGRES_USER=postgres
+#      - POSTGRES_PASSWORD=postgres
+#      - POSTGRES_DB=sentinel
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U postgres"]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#
+# When using PostgreSQL, also update the sentinel service:
+#    environment:
+#      - DB_DRIVER=postgresql
+#      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/sentinel
+#    depends_on:
+#      - postgres
+
+volumes:
+  sentinel-data:
