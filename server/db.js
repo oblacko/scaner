@@ -6,11 +6,15 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = process.env.DATABASE_URL && process.env.DATABASE_URL.endsWith('.db')
   ? process.env.DATABASE_URL
   : path.join(DATA_DIR, 'sentinel.db');
+
+// Ensure the directory that will actually hold the DB file exists.
+// (DB_PATH may live outside DATA_DIR when DATABASE_URL is an absolute path.)
+const DB_DIR = path.dirname(DB_PATH);
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 
 const sqlite = new Database(DB_PATH);
 sqlite.pragma('journal_mode = WAL');
