@@ -29,7 +29,8 @@ dist-ssr
 .env.*.local
 
 # Runtime data
-data/
+/data/
+server/data/
 *.db
 *.sqlite
 *.sqlite3

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useApp } from '@/contexts/AppContext';
 import { useMonitors } from '@/contexts/MonitorsContext';
-import { TEMPLATE_CATEGORIES, CUSTOM_TEMPLATES_LIST } from '@/data/templates';
+import { TEMPLATE_CATEGORIES, CUSTOM_TEMPLATES_LIST, type TemplateCategory } from '@/data/templates';
 import { shieldAlert, settings, layout, globe, lock, cpu, eye } from '@/utils/icons';
 import type { TemplateMode, ScheduleType, NotificationLevel } from '@/types';
 
@@ -238,7 +238,7 @@ export default function CreateMonitorSheet() {
 
             {templateMode === 'categories' && (
               <div className="grid grid-cols-2 gap-2">
-                {TEMPLATE_CATEGORIES.map(cat => {
+                {TEMPLATE_CATEGORIES.map((cat: TemplateCategory) => {
                   const checked = selectedCategories.includes(cat.id);
                   return (
                     <button
@@ -271,7 +271,7 @@ export default function CreateMonitorSheet() {
                   className="max-h-[200px] overflow-y-auto rounded-md border space-y-0.5 p-1 sentinel-scrollbar"
                   style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-subtle)' }}
                 >
-                  {CUSTOM_TEMPLATES_LIST.map(t => {
+                  {CUSTOM_TEMPLATES_LIST.map((t: string) => {
                     const checked = selectedTemplates.includes(t);
                     return (
                       <button

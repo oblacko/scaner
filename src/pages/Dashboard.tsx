@@ -20,7 +20,7 @@ export default function Dashboard() {
     acc + Object.values(m.findingCounts).reduce((a, b) => a + b, 0), 0
   );
 
-  const totalTemplates = TEMPLATE_CATEGORIES.reduce((acc, c) => acc + c.count, 0);
+  const totalTemplates = TEMPLATE_CATEGORIES.reduce((acc: number, c: typeof TEMPLATE_CATEGORIES[0]) => acc + c.count, 0);
 
   // Chart data — last 30 days
   const chartData = Array.from({ length: 30 }, (_, i) => {
