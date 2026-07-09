@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react';
 import { AppProvider, useApp } from '@/contexts/AppContext';
 import { MonitorsProvider } from '@/contexts/MonitorsContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
+import { api, auth, setUnauthorizedHandler } from '@/api';
 import Sidebar from '@/components/Sidebar';
+import Login from '@/components/Login';
 import ToastNotification from '@/components/ToastNotification';
 import CreateMonitorSheet from '@/components/CreateMonitorSheet';
 import Dashboard from '@/pages/Dashboard';
@@ -63,4 +66,31 @@ export default function App() {
       </SettingsProvider>
     </AppProvider>
   );
+}
+
+// Gate the app behind the login screen when the backend requires a password.
+function AuthGate() {
+  const [state, setState] = useState<'loading' | 'login' | 'ready'>('loading');
+
+  const check = () => {
+    api.authStatus()
+      .then(({ authRequired }) => {
+        if (!authRequired || auth.token) setState('ready');
+        else setState('login');
+      })
+      .catch(() => setState('ready')); // API down — let the app render its own error state
+  };
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => setState('login'));
+    check();
+  }, []);
+
+  if (state === 'loading') return <div style={{ backgroundColor: 'var(--bg-primary)' }} className="h-screen w-screen" />;
+  if (state === 'login') return <Login onSuccess={() => setState('ready')} />;
+  return <App />;
+}
+
+export function Root() {
+  return <AuthGate />;
 }

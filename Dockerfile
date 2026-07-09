@@ -42,9 +42,12 @@ COPY --from=nuclei-builder /root/nuclei-templates /root/nuclei-templates
 # Copy built frontend
 COPY --from=frontend-builder /app/dist ./dist
 
-# Copy server (CommonJS, zero build needed)
+# Copy server (CommonJS). better-sqlite3 is a native module — build it from
+# source (no musl prebuilds), then drop the toolchain to keep the image small.
 COPY server/ ./server/
-RUN cd server && npm install
+RUN apk add --no-cache --virtual .build-deps python3 make g++ \
+    && cd server && npm install --build-from-source \
+    && apk del .build-deps
 
 ENV NODE_ENV=production
 ENV PORT=3001

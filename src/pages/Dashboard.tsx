@@ -1,14 +1,22 @@
+import { useEffect, useState } from 'react';
 import { Target, Activity, AlertTriangle, FileCode } from 'lucide-react';
 import TopBar from '@/components/TopBar';
 import StatCard from '@/components/StatCard';
 import SeverityBadge from '@/components/SeverityBadge';
 import { useMonitors } from '@/contexts/MonitorsContext';
-import { TEMPLATE_CATEGORIES } from '@/data/templates';
+import { api } from '@/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays } from 'date-fns';
 
 export default function Dashboard() {
   const { monitors, scans } = useMonitors();
+  const [templateCount, setTemplateCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.getTemplates()
+      .then(t => setTemplateCount(t.categories.reduce((a, c) => a + c.count, 0)))
+      .catch(() => setTemplateCount(null));
+  }, []);
 
   const activeMonitors = monitors.filter(m => m.status === 'active').length;
   const totalScans7d = scans.filter(s => {
@@ -20,22 +28,13 @@ export default function Dashboard() {
     acc + Object.values(m.findingCounts).reduce((a, b) => a + b, 0), 0
   );
 
-  const totalTemplates = TEMPLATE_CATEGORIES.reduce((acc: number, c: typeof TEMPLATE_CATEGORIES[0]) => acc + c.count, 0);
-
-  // Chart data — last 30 days
+  // Chart data — last 30 days, computed from real scan findings (no mock data)
   const chartData = Array.from({ length: 30 }, (_, i) => {
     const date = subDays(new Date(), 29 - i);
     const dateStr = format(date, 'MMM dd');
-    // Mock realistic data
-    const dayScans = scans.filter(s => {
-      const sDate = new Date(s.startedAt);
-      return format(sDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
-    });
-    const critical = dayScans.reduce((acc, s) => acc + (s.findings || []).filter(f => f.severity === 'critical').length, 0) || Math.floor(Math.random() * 2);
-    const high = dayScans.reduce((acc, s) => acc + (s.findings || []).filter(f => f.severity === 'high').length, 0) || Math.floor(Math.random() * 3);
-    const medium = Math.floor(Math.random() * 4);
-    const low = Math.floor(Math.random() * 5);
-    return { date: dateStr, critical, high, medium, low };
+    const dayScans = scans.filter(s => format(new Date(s.startedAt || s.queuedAt || date), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
+    const bySeverity = (sev: string) => dayScans.reduce((acc, s) => acc + (s.findings || []).filter(f => f.severity === sev).length, 0);
+    return { date: dateStr, critical: bySeverity('critical'), high: bySeverity('high'), medium: bySeverity('medium'), low: bySeverity('low') };
   });
 
   // Severity distribution
@@ -61,26 +60,23 @@ export default function Dashboard() {
         <StatCard
           label="Active Monitors"
           value={activeMonitors}
-          delta={12}
           icon={<Target size={16} style={{ color: 'var(--text-muted)' }} />}
           variant="accent"
         />
         <StatCard
           label="Total Scans (7d)"
           value={totalScans7d}
-          delta={8}
           icon={<Activity size={16} style={{ color: 'var(--text-muted)' }} />}
         />
         <StatCard
           label="Vulnerabilities Found"
           value={totalFindings}
-          delta={-3}
           icon={<AlertTriangle size={16} style={{ color: 'var(--text-muted)' }} />}
           variant="alert"
         />
         <StatCard
           label="Templates Available"
-          value={`${(totalTemplates / 1000).toFixed(0)}k+`}
+          value={templateCount === null ? '—' : templateCount >= 1000 ? `${(templateCount / 1000).toFixed(1)}k` : String(templateCount)}
           icon={<FileCode size={16} style={{ color: 'var(--text-muted)' }} />}
         />
       </div>

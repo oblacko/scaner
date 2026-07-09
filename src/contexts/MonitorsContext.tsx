@@ -13,6 +13,7 @@ interface MonitorsContextType {
   updateMonitor: (id: string, updates: any) => Promise<void>;
   deleteMonitor: (id: string) => Promise<void>;
   triggerScan: (monitorId: string) => void;
+  stopScan: (scanId: string) => Promise<void>;
   getScanById: (scanId: string) => Scan | undefined;
 }
 
@@ -97,6 +98,16 @@ export function MonitorsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [addToast, loadData]);
 
+  const stopScan = useCallback(async (scanId: string) => {
+    try {
+      await api.stopScan(scanId);
+      addToast({ type: 'info', title: 'Scan Stopped', message: 'The scan was cancelled.' });
+      setTimeout(loadData, 300);
+    } catch (err: any) {
+      addToast({ type: 'alert', title: 'Error', message: err.message });
+    }
+  }, [addToast, loadData]);
+
   const getScanById = useCallback((scanId: string) => {
     return scans.find(s => s.id === scanId);
   }, [scans]);
@@ -106,7 +117,7 @@ export function MonitorsProvider({ children }: { children: React.ReactNode }) {
       monitors, scans, isLoading, error,
       refresh: loadData,
       createMonitor, updateMonitor, deleteMonitor,
-      triggerScan, getScanById,
+      triggerScan, stopScan, getScanById,
     }}>
       {children}
     </MonitorsContext.Provider>

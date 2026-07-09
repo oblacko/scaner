@@ -1,6 +1,20 @@
 # Sentinel — Security Monitor
 
-**Nuclei-powered vulnerability monitoring dashboard** with scheduled scans, multi-channel notifications, and real-time reporting.
+**Nuclei-powered vulnerability monitoring dashboard** with a scan queue, scheduled scans, multi-channel notifications, and real-time reporting.
+
+### Features
+- **Scan queue** with a configurable concurrency limit — scans wait as `queued` and start as slots free up
+- **Stop / cancel** running or queued scans (kills the nuclei process)
+- **Delete monitors** (cascades to their scans & findings)
+- **Detailed reports** — description, remediation, references, CVSS, tags, CVE and cURL per finding
+- **Live terminal streaming** of scan output via Server-Sent Events
+- **Real template catalog** from the installed nuclei-templates (search + one-click update)
+- **Password auth** (optional, single shared password via `AUTH_PASSWORD`)
+- **SQLite** storage (WAL) — no more JSON-file race conditions
+
+> ⚠️ Sentinel runs the `nuclei` CLI and needs a long-running server + a writable disk.
+> It will **not** work on serverless platforms (Vercel/Netlify functions). Deploy with
+> Docker on a VPS, Railway, Render, Fly.io, etc.
 
 ---
 
@@ -48,8 +62,7 @@ Frontend (React)  ◄────fetch────►  Backend (Express)
      :3000                          :3001
                                       │
                               ┌───────┴───────┐
-                              │  JSON-file DB   │
-                              │  (SQLite-ready) │
+                              │  SQLite (WAL)   │
                               └───────┬───────┘
                                       │
                               ┌───────┴───────┐
@@ -100,17 +113,32 @@ Frontend (React)  ◄────fetch────►  Backend (Express)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/health` | Health check |
+| `GET` | `/api/auth/status` | Whether a password is required |
+| `POST` | `/api/auth/login` | Exchange password for a token |
 | `GET` | `/api/monitors` | List monitors |
 | `POST` | `/api/monitors` | Create monitor |
 | `PATCH` | `/api/monitors/:id` | Update monitor |
-| `DELETE` | `/api/monitors/:id` | Delete monitor |
-| `GET` | `/api/scans` | List scans |
+| `DELETE` | `/api/monitors/:id` | Delete monitor (+ its scans) |
+| `GET` | `/api/scans` | List scans (with findings) |
 | `GET` | `/api/scans/:id` | Scan details |
-| `POST` | `/api/scans` | Trigger scan |
+| `POST` | `/api/scans` | Queue a scan |
+| `POST` | `/api/scans/:id/stop` | Stop a running/queued scan |
+| `GET` | `/api/scans/queue` | Current queue state |
+| `GET` | `/api/scans/:id/stream` | Live terminal output (SSE) |
+| `GET` | `/api/templates` | Template categories + counts |
+| `GET` | `/api/templates/search?q=` | Search template ids |
+| `POST` | `/api/templates/update` | Run `nuclei -update-templates` |
+| `GET` | `/api/export` | Export all data (JSON) |
 | `GET` | `/api/notifications/channels` | List channels |
 | `PATCH` | `/api/notifications/channels/:id` | Update channel |
 | `GET` | `/api/settings` | Get settings |
 | `PATCH` | `/api/settings` | Update settings |
+
+### Authentication
+
+Set `AUTH_PASSWORD` (env var) to require a login. All `/api/*` routes then require a
+`Bearer` token obtained from `POST /api/auth/login`. Leave it unset to run open (e.g.
+behind a VPN or for local use).
 
 ---
 

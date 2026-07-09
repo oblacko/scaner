@@ -1,8 +1,9 @@
 import {
   LayoutDashboard, Target, Clock, Bell, Settings,
-  ChevronRight
+  ChevronRight, LogOut
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { api, auth } from '@/api';
 import type { PageType } from '@/types';
 
 const NAV_ITEMS: { page: PageType; label: string; icon: React.ReactNode }[] = [
@@ -88,6 +89,16 @@ export default function Sidebar() {
           <div className="text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>Admin</div>
           <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>Security Team</div>
         </div>
+        <button
+          title="Sign out"
+          onClick={async () => { await api.logout(); auth.token = null; window.location.reload(); }}
+          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors focus-ring"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+        >
+          <LogOut size={14} />
+        </button>
       </div>
     </aside>
   );

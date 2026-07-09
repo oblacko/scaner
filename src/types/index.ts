@@ -2,7 +2,7 @@ export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 export type MonitorStatus = 'active' | 'paused' | 'error' | 'scanning';
 export type TemplateMode = 'all' | 'categories' | 'custom';
 export type ScheduleType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'custom';
-export type ScanStatus = 'completed' | 'failed' | 'running';
+export type ScanStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 export type NotificationLevel = 'all' | 'high' | 'never';
 export type PageType = 'dashboard' | 'monitors' | 'history' | 'notifications' | 'settings';
 export type DateFormatType = ' Jul 08, 2026' | '2026-07-08' | '08/07/2026';
@@ -14,9 +14,16 @@ export interface Finding {
   severity: Severity;
   host: string;
   matchedAt: string;
-  extracted?: string;
-  cve?: string;
+  description?: string;
   remediation?: string;
+  reference?: string[];
+  tags?: string[];
+  cvss?: number | null;
+  cve?: string;
+  extracted?: string;
+  curl?: string;
+  request?: string;
+  response?: string;
 }
 
 export interface Scan {
@@ -27,9 +34,11 @@ export interface Scan {
   duration: number;
   findings?: Finding[];
   status: ScanStatus;
+  queuedAt?: string;
   startedAt: string;
   completedAt?: string;
-  terminalOutput: string[];
+  error?: string;
+  terminalOutput: string | string[];
 }
 
 export interface Monitor {

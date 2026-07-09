@@ -40,6 +40,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           });
         }
       })
+      .catch(() => { /* keep defaults if API unavailable */ })
       .finally(() => setIsLoading(false));
   }, []);
 

@@ -1,4 +1,4 @@
-import { Plus, Search, Bell } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/contexts/AppContext';
 
@@ -39,26 +39,6 @@ export default function TopBar({ title, showNewMonitor = false }: TopBarProps) {
             New Monitor
           </Button>
         )}
-        <button
-          className="w-8 h-8 flex items-center justify-center rounded-md transition-colors focus-ring"
-          style={{ color: 'var(--text-muted)' }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-        >
-          <Search size={16} />
-        </button>
-        <button
-          className="w-8 h-8 flex items-center justify-center rounded-md transition-colors relative focus-ring"
-          style={{ color: 'var(--text-muted)' }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-        >
-          <Bell size={16} />
-          <span
-            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-            style={{ backgroundColor: 'var(--severity-high)' }}
-          />
-        </button>
       </div>
     </div>
   );
